@@ -1,5 +1,6 @@
 import { ethers } from 'ethers';
 import { config } from './config';
+import { getCreationBytecode } from './blockscout';
 
 export interface DecodedParameter {
   name: string;
@@ -36,6 +37,60 @@ export function extractConstructorArgs(
 }
 
 /**
+ * Brute-force locate constructor args when creation bytecode is unavailable.
+ * Strategy: try decoding at offsets around the runtime bytecode length.
+ */
+export function bruteForceConstructorArgs(
+  txInput: string,
+  abi: any[]
+): DecodedConstructor | null {
+  const constructor = abi.find(item => item.type === 'constructor');
+  if (!constructor) return { parameters: [] };
+  if (!constructor.inputs || constructor.inputs.length === 0) return { parameters: [] };
+
+  const abiCoder = new ethers.AbiCoder();
+  const inputHex = txInput.startsWith('0x') ? txInput.slice(2) : txInput;
+  const inputLen = inputHex.length;
+
+  // Minimum length needed: 32 * (#inputs) (bytes encoded in hex -> *2 chars)
+  const minChars = constructor.inputs.length * 64;
+  if (inputLen < minChars) return null;
+
+  // Heuristic offsets to try (chars, aligned to 32-byte words)
+  const offsets = new Set<number>();
+  // Try last 4096 chars region
+  for (let off = Math.max(0, inputLen - 4096); off <= inputLen - minChars; off += 64) {
+    offsets.add(off);
+  }
+  // Also try every 64 chars across the whole input but cap attempts
+  const maxAttempts = 120;
+  let attempts = 0;
+
+  for (const off of offsets) {
+    if (attempts >= maxAttempts) break;
+    attempts += 1;
+    const slice = '0x' + inputHex.slice(off);
+    try {
+      const decoded = abiCoder.decode(constructor.inputs as any, slice);
+      const parameters: DecodedParameter[] = constructor.inputs.map((input: any, index: number) => {
+        const value = decoded[index];
+        return {
+          name: input.name || `param${index}`,
+          type: input.type,
+          value: normalizeValueForJson(value),
+          formattedValue: formatValue(value, input.type),
+        };
+      });
+      return { parameters };
+    } catch {
+      // continue
+    }
+  }
+
+  return null;
+}
+
+/**
  * Get bytecode from Blockscout API or calculate from transaction input
  * For now, we'll try to get it from the explorer, but if not available,
  * we can estimate by finding the constructor args start
@@ -43,37 +98,45 @@ export function extractConstructorArgs(
 export async function getContractBytecode(
   contractAddress: string,
   network: 'mainnet' | 'testnet' = 'mainnet'
-): Promise<string | null> {
-  // 1) Try direct RPC (most reliable)
+): Promise<{ creationBytecode: string | null; runtimeBytecode: string | null }> {
+  let creationBytecode: string | null = null;
+  let runtimeBytecode: string | null = null;
+
+  // Prefer creation bytecode from Blockscout (includes full deployment bytecode)
+  creationBytecode = await getCreationBytecode(contractAddress, network);
+
+  // Runtime bytecode via RPC (fallback for verification and sanity)
   try {
     const rpcUrl = network === 'mainnet' ? config.rpc.mainnet : config.rpc.testnet;
     const provider = new ethers.JsonRpcProvider(rpcUrl);
     const code = await provider.getCode(contractAddress);
     if (code && code !== '0x') {
-      return code;
+      runtimeBytecode = code;
     }
   } catch (error) {
     console.error('Failed to fetch bytecode via RPC:', error);
   }
 
-  // 2) Fallback: Blockscout proxy
-  try {
-    const apiUrl = network === 'mainnet'
-      ? config.blockscout.mainnet
-      : config.blockscout.testnet;
+  // Fallback: Blockscout proxy for runtime
+  if (!runtimeBytecode) {
+    try {
+      const apiUrl = network === 'mainnet'
+        ? config.blockscout.mainnet
+        : config.blockscout.testnet;
 
-    const url = `${apiUrl}?module=proxy&action=eth_getCode&address=${contractAddress}&tag=latest`;
-    const response = await fetch(url);
-    const data = await response.json();
+      const url = `${apiUrl}?module=proxy&action=eth_getCode&address=${contractAddress}&tag=latest`;
+      const response = await fetch(url);
+      const data = await response.json();
 
-    if (data.result && data.result !== '0x') {
-      return data.result;
+      if (data.result && data.result !== '0x') {
+        runtimeBytecode = data.result;
+      }
+    } catch (error) {
+      console.error('Failed to fetch bytecode via Blockscout:', error);
     }
-  } catch (error) {
-    console.error('Failed to fetch bytecode via Blockscout:', error);
   }
   
-  return null;
+  return { creationBytecode, runtimeBytecode };
 }
 
 /**
@@ -86,8 +149,9 @@ export function decodeConstructorArgs(
   // Find constructor in ABI
   const constructor = abi.find(item => item.type === 'constructor');
   
+  // If no constructor entry, treat as zero-arg constructor
   if (!constructor) {
-    throw new Error('No constructor found in ABI');
+    return { parameters: [] };
   }
   
   if (!constructor.inputs || constructor.inputs.length === 0) {
@@ -102,11 +166,9 @@ export function decodeConstructorArgs(
   const abiCoder = new ethers.AbiCoder();
   
   try {
-    // Get the input types
-    const inputTypes = constructor.inputs.map((input: any) => input.type);
-    
     // Decode the arguments
-    const decoded = abiCoder.decode(inputTypes, encodedArgs);
+    // Pass full input definitions (handles tuples) to AbiCoder
+    const decoded = abiCoder.decode(constructor.inputs as any, encodedArgs);
     
     // Format the decoded values
     const parameters: DecodedParameter[] = constructor.inputs.map((input: any, index: number) => {
@@ -114,7 +176,7 @@ export function decodeConstructorArgs(
       return {
         name: input.name || `param${index}`,
         type: input.type,
-        value: value,
+        value: normalizeValueForJson(value),
         formattedValue: formatValue(value, input.type),
       };
     });
@@ -154,6 +216,37 @@ function formatValue(value: any, type: string): string {
 }
 
 /**
+ * Normalize values so they are JSON-serializable (convert bigint to string, recurse arrays/objects)
+ */
+function normalizeValueForJson(value: any): any {
+  if (value === null || value === undefined) return value;
+
+  if (typeof value === 'bigint') return value.toString();
+
+  // ethers v6 may return native BigInt or other objects; handle _hex too
+  if (typeof value === 'object' && value !== null) {
+    if ('_hex' in value) {
+      try {
+        return BigInt((value as any)._hex).toString();
+      } catch {
+        return String((value as any)._hex);
+      }
+    }
+    if (Array.isArray(value)) {
+      return value.map((v) => normalizeValueForJson(v));
+    }
+    // For structs/tuples, convert each field
+    const out: any = {};
+    for (const [k, v] of Object.entries(value)) {
+      out[k] = normalizeValueForJson(v);
+    }
+    return out;
+  }
+
+  return value;
+}
+
+/**
  * Main decoder function that extracts bytecode and decodes constructor args
  * Strategy: Get deployed bytecode from contract, which matches the bytecode in tx input
  */
@@ -163,30 +256,47 @@ export async function decodeConstructorFromTx(
   contractAddress: string,
   network: 'mainnet' | 'testnet' = 'mainnet'
 ): Promise<DecodedConstructor> {
-  // Get the deployed bytecode (this is what was in the transaction input, minus constructor args)
-  const deployedBytecode = await getContractBytecode(contractAddress, network);
-  
-  if (!deployedBytecode) {
-    throw new Error('Unable to fetch contract bytecode. Please ensure the contract is deployed and accessible.');
+  // Fetch creation bytecode (preferred) and runtime bytecode (fallback)
+  const { creationBytecode, runtimeBytecode } = await getContractBytecode(contractAddress, network);
+
+  // Choose bytecode for slicing (prefer creation bytecode)
+  const bytecodeForSlicing = creationBytecode || runtimeBytecode;
+
+  if (!bytecodeForSlicing) {
+    throw new Error('Unable to fetch contract bytecode. Please ensure the contract is deployed, accessible, and verified.');
   }
-  
-  // The transaction input contains: deployment_bytecode + constructor_args
-  // The deployed bytecode is what's stored on-chain (same as deployment_bytecode for standard contracts)
-  // So constructor args = txInput - deployedBytecode
-  const constructorArgs = extractConstructorArgs(txInput, deployedBytecode);
-  
+
+  // Extract constructor arguments
+  const constructorArgs = extractConstructorArgs(txInput, bytecodeForSlicing);
+
   // Validate that we extracted something reasonable
   if (constructorArgs === '0x' || constructorArgs.length <= 2) {
     // Check if constructor actually has parameters
     const constructor = abi.find(item => item.type === 'constructor');
     if (constructor && constructor.inputs && constructor.inputs.length > 0) {
-      throw new Error('Constructor has parameters but no encoded data found. This may indicate the bytecode extraction failed.');
+      throw new Error('Constructor has parameters but no encoded data found. This may indicate the bytecode extraction failed (missing creation bytecode).');
     }
     // No constructor arguments
     return { parameters: [] };
   }
-  
-  // Decode the arguments
-  return decodeConstructorArgs(abi, constructorArgs);
+
+  try {
+    return decodeConstructorArgs(abi, constructorArgs);
+  } catch (error) {
+    // If we used runtime bytecode, the slice may be too short; try brute-force recovery
+    const usedRuntime = !creationBytecode && !!runtimeBytecode;
+
+    if (usedRuntime) {
+      const brute = bruteForceConstructorArgs(txInput, abi);
+      if (brute) return brute;
+    }
+
+    const hint = usedRuntime
+      ? ' Decoding failed using runtime bytecode; creation bytecode may be required.'
+      : '';
+    throw new Error(
+      `${error instanceof Error ? error.message : 'Failed to decode constructor arguments.'}${hint}`
+    );
+  }
 }
 

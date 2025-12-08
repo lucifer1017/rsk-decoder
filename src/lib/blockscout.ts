@@ -6,6 +6,30 @@ export interface BlockscoutABIResponse {
   result: string; // JSON string of ABI array
 }
 
+export interface BlockscoutSourceCodeResult {
+  SourceCode?: string;
+  ABI?: string;
+  ContractName?: string;
+  CompilerVersion?: string;
+  OptimizationUsed?: string;
+  Runs?: string;
+  ConstructorArguments?: string;
+  EVMVersion?: string;
+  Library?: string;
+  LicenseType?: string;
+  Proxy?: string;
+  Implementation?: string;
+  SwarmSource?: string;
+  Bytecode?: string; // creation bytecode (preferred)
+  CreationBytecode?: string; // sometimes provided separately
+}
+
+export interface BlockscoutSourceCodeResponse {
+  status: string;
+  message: string;
+  result: BlockscoutSourceCodeResult[];
+}
+
 /**
  * Fetch contract ABI from Blockscout Explorer
  */
@@ -39,6 +63,36 @@ export async function getContractABI(
   } catch (error) {
     throw new Error('Failed to parse ABI JSON');
   }
+}
+
+/**
+ * Fetch contract creation bytecode from Blockscout (preferred over runtime code for slicing args)
+ */
+export async function getCreationBytecode(
+  contractAddress: string,
+  network: 'mainnet' | 'testnet' = config.defaultNetwork
+): Promise<string | null> {
+  try {
+    const apiUrl = network === 'mainnet' ? config.blockscout.mainnet : config.blockscout.testnet;
+    const url = `${apiUrl}?module=contract&action=getsourcecode&address=${contractAddress}`;
+    const response = await fetch(url);
+    const data: BlockscoutSourceCodeResponse = await response.json();
+
+    if (data.status === '0' || !data.result || data.result.length === 0) {
+      return null;
+    }
+
+    const entry = data.result[0];
+    // Prefer explicit CreationBytecode if present, otherwise Bytecode
+    const creation = entry.CreationBytecode || entry.Bytecode;
+    if (creation && creation !== '0x') {
+      return creation;
+    }
+  } catch (error) {
+    console.error('Failed to fetch creation bytecode via Blockscout:', error);
+  }
+
+  return null;
 }
 
 
