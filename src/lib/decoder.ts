@@ -13,10 +13,6 @@ export interface DecodedConstructor {
   parameters: DecodedParameter[];
 }
 
-/**
- * Extract constructor arguments from transaction input
- * Transaction input = bytecode + encoded constructor arguments
- */
 export function extractConstructorArgs(
   txInput: string,
   contractBytecode: string
@@ -36,10 +32,6 @@ export function extractConstructorArgs(
   return '0x' + constructorArgs;
 }
 
-/**
- * Brute-force locate constructor args when creation bytecode is unavailable.
- * Strategy: try decoding at offsets around the runtime bytecode length.
- */
 export function bruteForceConstructorArgs(
   txInput: string,
   abi: any[]
@@ -90,11 +82,6 @@ export function bruteForceConstructorArgs(
   return null;
 }
 
-/**
- * Get bytecode from Blockscout API or calculate from transaction input
- * For now, we'll try to get it from the explorer, but if not available,
- * we can estimate by finding the constructor args start
- */
 export async function getContractBytecode(
   contractAddress: string,
   network: 'mainnet' | 'testnet' = 'mainnet'
@@ -139,9 +126,6 @@ export async function getContractBytecode(
   return { creationBytecode, runtimeBytecode };
 }
 
-/**
- * Decode constructor arguments using ABI
- */
 export function decodeConstructorArgs(
   abi: any[],
   encodedArgs: string
@@ -187,9 +171,6 @@ export function decodeConstructorArgs(
   }
 }
 
-/**
- * Format decoded value for display
- */
 function formatValue(value: any, type: string): string {
   if (value === null || value === undefined) {
     return 'null';
@@ -215,9 +196,6 @@ function formatValue(value: any, type: string): string {
   return String(value);
 }
 
-/**
- * Normalize values so they are JSON-serializable (convert bigint to string, recurse arrays/objects)
- */
 function normalizeValueForJson(value: any): any {
   if (value === null || value === undefined) return value;
 

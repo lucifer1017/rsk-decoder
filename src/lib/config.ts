@@ -1,4 +1,3 @@
-// Rootstock Configuration
 export const config = {
   rpc: {
     mainnet: process.env.NEXT_PUBLIC_ROOTSTOCK_RPC_MAINNET || 'https://public-node.rsk.co',

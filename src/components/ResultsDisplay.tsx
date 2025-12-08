@@ -27,7 +27,6 @@ export default function ResultsDisplay({
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6">
-      {/* Header Info */}
       <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-6 border border-blue-100">
         <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
           <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -84,7 +83,6 @@ export default function ResultsDisplay({
         </div>
       </div>
 
-      {/* Parameters Table */}
       {parameters.length === 0 ? (
         <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg">
           <p className="text-yellow-800">This contract has no constructor parameters.</p>

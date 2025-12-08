@@ -36,7 +36,6 @@ export default function TransactionInput({ onDecode, isLoading }: TransactionInp
   return (
     <div className="w-full max-w-4xl mx-auto">
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Network Selector */}
         <div className="flex items-center gap-4">
           <label className="text-sm font-medium text-gray-700">Network:</label>
           <div className="flex gap-2">
@@ -65,7 +64,6 @@ export default function TransactionInput({ onDecode, isLoading }: TransactionInp
           </div>
         </div>
 
-        {/* Input Field */}
         <div className="relative">
           <input
             type="text"
@@ -86,14 +84,12 @@ export default function TransactionInput({ onDecode, isLoading }: TransactionInp
                         pointer-events-none opacity-0 focus-within:opacity-100 transition-opacity duration-300" />
         </div>
 
-        {/* Error Message */}
         {error && (
           <div className="px-4 py-3 bg-red-50 border-l-4 border-red-500 rounded-lg">
             <p className="text-sm text-red-700">{error}</p>
           </div>
         )}
 
-        {/* Submit Button */}
         <button
           type="submit"
           disabled={isLoading}

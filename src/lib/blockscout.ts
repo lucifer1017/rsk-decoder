@@ -20,8 +20,8 @@ export interface BlockscoutSourceCodeResult {
   Proxy?: string;
   Implementation?: string;
   SwarmSource?: string;
-  Bytecode?: string; // creation bytecode (preferred)
-  CreationBytecode?: string; // sometimes provided separately
+  Bytecode?: string;
+  CreationBytecode?: string;
 }
 
 export interface BlockscoutSourceCodeResponse {
@@ -30,9 +30,6 @@ export interface BlockscoutSourceCodeResponse {
   result: BlockscoutSourceCodeResult[];
 }
 
-/**
- * Fetch contract ABI from Blockscout Explorer
- */
 export async function getContractABI(
   contractAddress: string,
   network: 'mainnet' | 'testnet' = config.defaultNetwork
@@ -65,9 +62,6 @@ export async function getContractABI(
   }
 }
 
-/**
- * Fetch contract creation bytecode from Blockscout (preferred over runtime code for slicing args)
- */
 export async function getCreationBytecode(
   contractAddress: string,
   network: 'mainnet' | 'testnet' = config.defaultNetwork

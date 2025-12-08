@@ -51,16 +51,13 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Background Gradient Effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob"></div>
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
       </div>
 
-      {/* Main Content */}
       <div className="relative z-10 container mx-auto px-4 py-12 md:py-20">
-        {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-5xl md:text-6xl font-bold mb-4 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
             Rootstock Constructor Decoder
@@ -76,12 +73,10 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Input Section */}
         <div className="mb-12">
           <TransactionInput onDecode={handleDecode} isLoading={isLoading} />
         </div>
 
-        {/* Error Display */}
         {error && (
           <div className="mb-8 max-w-4xl mx-auto">
             <div className="bg-red-50 border-l-4 border-red-500 rounded-lg p-6 shadow-lg">
@@ -98,7 +93,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* Results Display */}
         {decodedData && (
           <div className="animate-fade-in">
             <ResultsDisplay
@@ -110,7 +104,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* Footer Info */}
         {!decodedData && !error && !isLoading && (
           <div className="mt-16 text-center">
             <div className="inline-block bg-gray-50 rounded-2xl px-8 py-6 border border-gray-200">
