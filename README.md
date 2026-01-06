@@ -18,6 +18,22 @@ A vital tool for the Rootstock inspection suite that decodes constructor argumen
 npm install
 ```
 
+### Environment Variables (Optional)
+
+The app works out of the box with default public endpoints. However, you can configure custom RPC endpoints or API keys by creating a `.env.local` file:
+
+1. Copy `.env.example` to `.env.local`:
+   ```bash
+   cp .env.example .env.local
+   ```
+
+2. Edit `.env.local` with your custom endpoints (if needed):
+   - **RPC Endpoints**: Use these if you have API keys for higher rate limits
+     - Get API keys from [Rootstock RPC API](https://dev.rootstock.io/developers/rpc-api/rootstock/setup/) or [Alchemy](https://www.alchemy.com/rootstock)
+   - **Blockscout API**: Usually not needed unless using a custom explorer instance
+
+**Note**: All environment variables are optional. The app uses public endpoints by default.
+
 ### Run Development Server
 
 ```bash
