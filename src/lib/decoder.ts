@@ -142,9 +142,6 @@ export function decodeConstructorArgs(
     return { parameters: [] };
   }
   
-  // Create interface from ABI
-  const iface = new ethers.Interface(abi);
-  
   // For constructors, we use AbiCoder to decode directly
   // Constructors don't have function selectors, so the encoded args are directly ABI-encoded
   const abiCoder = new ethers.AbiCoder();
