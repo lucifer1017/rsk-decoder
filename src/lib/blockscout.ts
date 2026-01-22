@@ -83,7 +83,7 @@ export async function getCreationBytecode(
       return creation;
     }
   } catch (error) {
-    console.error('Failed to fetch creation bytecode via Blockscout:', error);
+    // Silently fail - will return null
   }
 
   return null;

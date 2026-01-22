@@ -101,7 +101,7 @@ export async function getContractBytecode(
       runtimeBytecode = code;
     }
   } catch (error) {
-    console.error('Failed to fetch bytecode via RPC:', error);
+    // Silently fail - will try fallback
   }
 
   // Fallback: Blockscout proxy for runtime
@@ -119,7 +119,7 @@ export async function getContractBytecode(
         runtimeBytecode = data.result;
       }
     } catch (error) {
-      console.error('Failed to fetch bytecode via Blockscout:', error);
+      // Silently fail - will return null
     }
   }
   

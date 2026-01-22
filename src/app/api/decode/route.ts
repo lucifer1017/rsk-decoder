@@ -99,7 +99,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error('Decode error:', error);
     return NextResponse.json(
       {
         success: false,
